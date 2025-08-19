@@ -3,7 +3,7 @@
 
   <xsl:variable name="witness-id"><xsl:value-of select="/TEI/teiHeader/fileDesc/sourceDesc/msDesc/msIdentifier/@xml:id"/></xsl:variable>
 
-  <xsl:output method="text" indent="yes"/>
+  <xsl:output method="text" indent="no"/>
   <xsl:strip-space elements="div"/>
 
 
@@ -14,14 +14,7 @@
   </xsl:template>
 
   <xsl:template match="text()">
-        <xsl:analyze-string select="." regex="ϗ">
-            <xsl:matching-substring>
-              <xsl:text>(καὶ)</xsl:text>
-            </xsl:matching-substring>
-            <xsl:non-matching-substring>
-                <xsl:value-of select="."/>
-            </xsl:non-matching-substring>
-        </xsl:analyze-string>
+      <xsl:value-of select="normalize-space(.)"/>
   </xsl:template>
 
   <!--<xsl:template match="div[@subtype='chapter']">
@@ -85,22 +78,33 @@
     </xsl:choose>
   </xsl:template>
 
-  <xsl:template match="del">
-    <xsl:text>{del=</xsl:text>
-    <xsl:apply-templates/><xsl:text>–</xsl:text><xsl:value-of select="@rend"/>
-    <xsl:text>}</xsl:text>
+  <xsl:template match="subst">
+    <xsl:text>&lt;</xsl:text>
+    <xsl:apply-templates select="del"/>
+    <xsl:apply-templates select="add"/>
+    <xsl:text>&gt;</xsl:text>
   </xsl:template>
 
-  <xsl:template match="add">
-    <xsl:text>{add=</xsl:text>
-    <xsl:apply-templates/><xsl:text>–</xsl:text><xsl:value-of select="@place"/>
-    <xsl:text>}</xsl:text>
-  </xsl:template>
-  
+<xsl:template match="del">
+  <xsl:variable name="content">
+    <xsl:apply-templates/>
+  </xsl:variable>
+  <xsl:sequence select="concat('{del=', $content, '-', @rend, '}')"/>
+</xsl:template>
+
+<xsl:template match="add">
+  <xsl:variable name="content">
+    <xsl:apply-templates/>
+  </xsl:variable>
+  <xsl:sequence select="concat('{add=', $content, '-', @place, '}')"/>
+</xsl:template>
+
+
+
   <xsl:template match="gap">
     <xsl:variable name="count" select="@quantity"/>
     <xsl:variable name="unit" select="@unit"/>
-    
+
     <xsl:for-each select="1 to $count">
       <xsl:choose>
         <xsl:when test="$unit='line'">
@@ -114,14 +118,14 @@
         <xsl:when test="$unit='character'">
           <xsl:text>{c}</xsl:text>
         </xsl:when>
-      </xsl:choose>    
+      </xsl:choose>
     </xsl:for-each>
   </xsl:template>
 
   <xsl:template match="choice">
-		<xsl:text>(</xsl:text>
+		<xsl:text> (</xsl:text>
 		<xsl:value-of select="tei:expan"/>
-		<xsl:text>)</xsl:text>
+		<xsl:text>) </xsl:text>
 	</xsl:template>
 
 <xsl:template match="g">
