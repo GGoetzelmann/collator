@@ -48,13 +48,33 @@ def postprocessTokens(tokenized_text, norm_dict):
             td["n"] = norm_dict[td["n"]]
     return tokenized_text
 
+def normalize(inputText):
+    ## remove annotations
+    normalized = re.sub(r'[(){}=–]+', r'', inputText)
+    normalized = re.sub(r'add', r'', normalized)
+    normalized = re.sub(r'del', r'', normalized)
+    normalized = re.sub(r'margin', r'', normalized)
+    normalized = re.sub(r'above', r'', normalized)
+    normalized = re.sub(r'inline', r'', normalized)
+    normalized = re.sub(r'overline', r'', normalized)
+    normalized = re.sub(r'strikethrough', r'', normalized)
+    normalized = re.sub(r'erasure', r'', normalized)
+    normalized = re.sub(r'initial', r'', normalized)
+    normalized = re.sub(r'ekthesis', r'', normalized)
+    normalized = re.sub(r'unclear', r'', normalized)
+    ## unicode normalization
+    normalized = unicodedata.normalize("NFD", normalized).translate({ord(c): None for c in "̓̔́̀͂̈ͅ"}).lower().strip()
+    if normalized == "":
+        normalized = " "
+    return normalized
+
 def processToken(inputText):
-    return {"t": inputText.strip(), "n": unicodedata.normalize("NFD", inputText).translate({ord(c): None for c in "̓̔́̀͂̈ͅ"}).lower().strip()}
+    return {"t": inputText.strip(), "n": normalize(inputText)}
 
 def diacritics(inputText):
-    return [processToken(token) for token in re.findall(r'\S+\s*', inputText)]
+    return [processToken(token) for token in re.findall(r'[\w\S]+', inputText, flags=re.UNICODE)]
 
-def interpunction(inputText):
+def delete_interpunction(inputText):
     return re.sub(r'[.,:··;›»⁘—\+\-\n]+', r'', inputText)
 
 def clean(text):
@@ -73,6 +93,56 @@ def clean(text):
     cleaned = cleaned.replace(">", "")
 
     return cleaned
+
+def merge_identical_rows(data):
+    """Merge identical rows in generated all_variants list of lists"""
+    merged = []
+
+    # Signature = sorted list of numeric‐tails of all sublists
+    def signature(row):
+        return sorted(tuple(sub[2:]) for sub in row)
+
+    for row in data:
+        sig = signature(row)
+
+        if merged and signature(merged[-1]) == sig:
+            # Same multiset of tails → merge all sublists by their tail‐key
+            acc = {}     # tail-tuple → full sublist with merged texts
+            order = []   # to remember the order in which tails first appear
+
+            # 1) seed from the already‐merged row
+            for sub in merged[-1]:
+                tail = tuple(sub[2:])
+                if tail not in acc:
+                    order.append(tail)
+                    acc[tail] = sub[:]  # copy entire original sublist
+
+            # 2) absorb the new row’s sublists
+            for sub in row:
+                tail = tuple(sub[2:])
+                txt0, txt1 = str(sub[0]), str(sub[1])
+                if tail in acc:
+                    # concatenate the first two fields (as long as the first is not empty)
+                    if txt0:
+                        acc[tail][0] += " " + txt0
+                        acc[tail][1] += " " + txt1
+                    else:
+                        acc[tail][0] += "" + txt0
+                        acc[tail][1] += "" + txt1
+                else:
+                    # brand-new tail (shouldn’t happen if signatures matched exactly)
+                    order.append(tail)
+                    acc[tail] = sub[:]
+
+            # 3) rebuild merged[-1] in the original order
+            merged[-1] = [acc[tail] for tail in order]
+
+        else:
+            # New signature → copy row in full
+            new_row = [sub[:] for sub in row]
+            merged.append(new_row)
+
+    return merged
 
 def convert_xml_to_plaintext(xml_files, norm_dict=None):
     """Convert the list of encoded files to plain text, using the auxilary XSLT script. This requires
@@ -109,7 +179,7 @@ def convert_xml_to_plaintext(xml_files, norm_dict=None):
         text = re.search(r'\{content:([\W\w\s]*)}', str(buffer.decode('utf-8'))).group(1)
         text = unicodedata.normalize("NFC", text)
         if args['--interpunction']:
-            text = interpunction(text)
+            text = delete_interpunction(text)
         text = diacritics(clean(text))
         # convert text to tokens
         # additional normalization
@@ -164,6 +234,18 @@ def collation_json(table):
         logging.info(f'Write JSON-Collation-file file to {fp.name}')
     return fp   
 
+def write_metadata_file(metadata):
+    """Write the `metadata` to a local file for reference.
+    """
+    if args['--output']:
+        output_file = args['--output']
+    else:
+        output_file = 'output'
+    with open(output_file+"_metadata.json", "w", encoding='utf8') as fp:
+        fp.write(json.dumps(metadata, indent=4, ensure_ascii=False))
+        logging.info(f'Write metadata file to {fp.name}')
+    return fp
+
 def get_collation_metadata(data):
     """Process the collation table and extract metadata.
 
@@ -181,6 +263,7 @@ def get_collation_metadata(data):
         metadata['threshold'] = ""
     metadata['time_start'] = data['align_start']
     metadata['time_end'] = data['align_end']
+    write_metadata_file(metadata)
     return metadata
 
 def collation_table_csv_file(data, output_file):
@@ -266,7 +349,8 @@ def collation_table_graph_file(data, output_file):
     flatlist = []
     start = {"id":"0.0","word":"°","witnesses":data["witnesses"]}
     flatlist.append(start)
-    for list_i in all_readings:
+    all_readings_merged = merge_identical_rows(all_readings)
+    for list_i in all_readings_merged:
         tokens = [item[0] for item in list_i if item[0]]
         seen = set()
         duplicates = [x for x in tokens if x in seen or seen.add(x)] 
@@ -383,7 +467,8 @@ def collation_table_nexus_file(data,output_file):
         all_readings.append(sorted_witnesses)
     flatlist = []
     symbols = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "k", "l", "m", "n", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",]
-    for list_i in all_readings:
+    all_readings_merged = merge_identical_rows(all_readings)
+    for list_i in all_readings_merged:
         tokens = [item[0] for item in list_i if item[0]]
         seen = set()
         duplicates = [x for x in tokens if x in seen or seen.add(x)]
@@ -865,7 +950,8 @@ def collation_table_tei(data):
     text.appendChild(body)
     p = d.createElementNS("http://www.tei-c.org/ns/1.0", "p")
     body.appendChild(p)
-    for list_i in all_readings:
+    all_readings_merged = merge_identical_rows(all_readings)
+    for list_i in all_readings_merged:
         # test whether there are variants. If not:
         if len(list_i) == 1:
             for entry in list_i:
@@ -883,7 +969,7 @@ def collation_table_tei(data):
             for entry in list_i:
                 rdg = d.createElementNS("http://www.tei-c.org/ns/1.0", "rdg")
                 app.appendChild(rdg)
-                text_node = d.createTextNode(re.sub(" ","",entry[1]))
+                text_node = d.createTextNode(re.sub("\\s+"," ",entry[1]))
                 rdg.appendChild(text_node)
                 if entry[1] == "":
                     rdg.setAttribute("type","omission")
