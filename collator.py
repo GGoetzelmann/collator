@@ -20,6 +20,7 @@ Options:
   -d, --distance <value>  Set distance value between 0 and 1
   -o, --output <file>     Location of the output files (input-json, collation-json and collation-html, collation-xml, collation-csv). [default: ./output].
   -i, --interpunction     Do collation without interpunction [default: with interpunction].
+  --normalizations <file> Custom normalizations provided as csv file path.
   -V, --verbosity <level> Set verbosity. Possibilities: silent, info, debug [default: info].
   -v, --version           Show version and exit.
   -h, --help              Show this help message and exit.
@@ -41,6 +42,12 @@ __version__ = '0.4.0'
 
 BASE_DIR = os.path.dirname(__file__)
 
+def postprocessTokens(tokenized_text, norm_dict):
+    for td in tokenized_text:
+        if norm_dict.get(td["n"]):
+            td["n"] = norm_dict[td["n"]]
+    return tokenized_text
+
 def processToken(inputText):
     return {"t": inputText.strip(), "n": unicodedata.normalize("NFD", inputText).translate({ord(c): None for c in "̓̔́̀͂̈ͅ"}).lower().strip()}
 
@@ -58,7 +65,7 @@ def clean(text):
     cleaned = re.sub(r"\s([).,··:;?]+)",r"\1",cleaned)
     return cleaned
 
-def convert_xml_to_plaintext(xml_files):
+def convert_xml_to_plaintext(xml_files, norm_dict=None):
     """Convert the list of encoded files to plain text, using the auxilary XSLT script. This requires
     saxon installed.
 
@@ -96,6 +103,9 @@ def convert_xml_to_plaintext(xml_files):
             text = interpunction(text)
         text = diacritics(clean(text))
         # convert text to tokens
+        # additional normalization
+        if norm_dict:
+            text = postprocessTokens(text, norm_dict)
         witness_dictionary = dict(id=siglum,tokens=text)
         output_dict['witnesses'].append(witness_dictionary)
     return output_dict
@@ -127,11 +137,11 @@ def run_collatex(input_file):
     """
     logging.info(f'Running collatex. This may take some time...')
     collatex_binary = os.path.join(BASE_DIR, 'vendor/collatex-tools-1.8-SNAPSHOT-TSAligner.jar')
-    cmd = subprocess.Popen(['java', '-jar', collatex_binary, '-t', 
+    cmd = subprocess.Popen([os.environ["JAVA_HOME"] + '/bin/java', '-jar', collatex_binary, '-t',
                             input_file.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = cmd.communicate()
     if err:
-        pass #raise Exception(err)
+        raise Exception(err)
     return json.loads(out)
 
 def collation_json(table):
@@ -904,7 +914,23 @@ if __name__ == "__main__":
 
     logging.info('App and logging initiated.')
 
-    witnesses = convert_xml_to_plaintext(args["<file>"])
+    norm_dict = {}
+    if args.get("--normalizations"):
+        norm_file = args['--normalizations']
+        try:
+            assert os.path.exists(norm_file) and os.path.isfile(norm_file)
+        except AssertionError:
+            logging.error("normalization parameter is not a valid file")
+            exit(1)
+        with open(norm_file) as f:
+            reader = csv.reader(f)
+            headers = tuple(next(reader))
+            if headers[0] == "in":
+                norm_dict = dict(list(tuple(line) for line in reader))
+            if headers[1] == "in":
+                norm_dict = dict(list(reversed(tuple(line)) for line in reader))
+
+    witnesses = convert_xml_to_plaintext(args["<file>"], norm_dict)
     json_tmp_file = write_collation_file(witnesses)
     collation_table = run_collatex(json_tmp_file)
     collation_json_file = collation_json(collation_table)
