@@ -59,10 +59,19 @@ def interpunction(inputText):
 
 def clean(text):
     """Remove superfluous spaces and linebreaks from extracted text"""
-    cleaned = re.sub(r"\n",r"",text)
-    cleaned = re.sub(r"\s{2,}",r" ",cleaned)
-    cleaned = re.sub(r"=\s",r"=",cleaned)
-    cleaned = re.sub(r"\s([).,··:;?]+)",r"\1",cleaned)
+    # Remove all newlines
+    cleaned = re.sub(r"\n", "", text)
+    # Collapse multiple spaces into one
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    # Remove space after equal signs (e.g., {add= ε-inline} → {add=ε-inline})
+    cleaned = re.sub(r"=\s+", "=", cleaned)
+    # Remove space before punctuation
+    cleaned = re.sub(r"\s([).,··:;?]+)", r"\1", cleaned)
+    #remove leftover of substitution rule
+    cleaned = re.sub(r'<(.*?)>', lambda m: f"<{''.join(m.group(1).split())}>", cleaned)
+    cleaned = cleaned.replace("<", "")
+    cleaned = cleaned.replace(">", "")
+
     return cleaned
 
 def convert_xml_to_plaintext(xml_files, norm_dict=None):
