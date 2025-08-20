@@ -115,7 +115,9 @@ if submitted:
         if result.returncode != 0:
             st.text(result.stderr)
         else:
-            st.download_button("Download XML output", "output.xml", file_name="collationresult.xml", on_click="ignore")
+            with open("output.xml", "rb") as output_file:
+                print("Hello world")
+                st.download_button("Download XML output", output_file, file_name="collationresult.xml", on_click="ignore")
             st.html("output.html")
             # we assume the collator ran successfully
             #with open("output.xml", "r") as xml_out:
