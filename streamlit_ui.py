@@ -5,7 +5,8 @@ import requests
 import os
 
 # Streamlit app title
-st.title("CLI Script Parameter Form")
+st.title("Collator UI")
+st.set_page_config(page_title="Collator")
 
 # Create a form for CLI parameters
 with st.form("cli_form"):
