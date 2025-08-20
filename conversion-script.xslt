@@ -88,21 +88,33 @@
     <xsl:text>&gt;</xsl:text>
   </xsl:template>
 
-<xsl:template match="del">
-  <xsl:variable name="content">
-    <xsl:apply-templates/>
-  </xsl:variable>
-  <xsl:sequence select="concat('{del=', $content, '-', @rend, '}')"/>
-</xsl:template>
 
-<xsl:template match="add">
-  <xsl:variable name="content">
-    <xsl:apply-templates/>
-  </xsl:variable>
-  <xsl:sequence select="concat('{add=', $content, '-', @place, '}')"/>
-</xsl:template>
+  <xsl:template match="del">
+    <xsl:if test="preceding-sibling::node()[1][self::text() or self::hi or self::lb]">
+      <xsl:text> </xsl:text>
+    </xsl:if>
+    <xsl:variable name="content">
+      <xsl:apply-templates/>
+    </xsl:variable>
+    <xsl:sequence select="concat('{del=', $content, '-', @rend, '}')"/>
+    <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
+      <xsl:text> </xsl:text>
+    </xsl:if>
+  </xsl:template>
 
 
+  <xsl:template match="add">
+    <xsl:if test="preceding-sibling::node()[1][self::text() or self::hi or self::lb]">
+      <xsl:text> </xsl:text>
+    </xsl:if>
+    <xsl:variable name="content">
+      <xsl:apply-templates/>
+    </xsl:variable>
+    <xsl:sequence select="concat('{add=', $content, '-', @rend, '}')"/>
+    <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
+      <xsl:text> </xsl:text>
+    </xsl:if>
+  </xsl:template>
 
   <xsl:template match="gap">
     <xsl:variable name="count" select="@quantity"/>
