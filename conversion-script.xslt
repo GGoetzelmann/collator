@@ -45,34 +45,6 @@
     </xsl:choose>
   </xsl:template>
 
-
-  <xsl:template match="unclear">{unclear–<xsl:apply-templates/>}</xsl:template>
-
-  <xsl:template match="hi">
-    <xsl:choose>
-      <xsl:when test="@rend='underline'">
-        <xsl:text>{underline=</xsl:text>
-        <xsl:apply-templates/>
-        <xsl:text>}</xsl:text>
-        <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
-          <xsl:text> </xsl:text>
-        </xsl:if>
-      </xsl:when>
-      <xsl:when test="@rend='rubricated'">
-        <xsl:if test="preceding-sibling::node()[1][self::text() or self::hi or self::lb]">
-          <xsl:text> </xsl:text>
-        </xsl:if>
-        <xsl:apply-templates/>
-        <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
-          <xsl:text> </xsl:text>
-        </xsl:if>
-      </xsl:when>
-      <xsl:otherwise>
-        <xsl:apply-templates/>
-      </xsl:otherwise>
-    </xsl:choose>
-  </xsl:template>
-
   <xsl:template match="pb">
     <xsl:choose>
       <xsl:when test="@break='no'">
@@ -81,39 +53,50 @@
     </xsl:choose>
   </xsl:template>
 
+    <!--  Unified template for inline elements  -->
+  <xsl:template match="hi | del | add | unclear">
+    <xsl:variable name="prev" select="preceding-sibling::node()[1]"/>
+    <xsl:variable name="next" select="following-sibling::node()[1]"/>
+    <xsl:variable name="at-word-start" select="matches($prev, '[a-zA-Z]$')"/>
+    <xsl:variable name="at-word-end" select="matches($next, '^[a-zA-Z]')"/>
+    <xsl:variable name="inside-word" select="$at-word-start or $at-word-end"/>
+
+  <xsl:if test="not($at-word-start) and $prev/self::text()">
+      <xsl:text> </xsl:text>
+    </xsl:if>
+    <xsl:choose>
+      <xsl:when test="self::hi[@rend='underline']">
+        <xsl:text>{underline=</xsl:text>
+        <xsl:apply-templates/>
+        <xsl:text>}</xsl:text>
+      </xsl:when>
+      <xsl:when test="self::hi[@rend='rubricated']">
+        <xsl:apply-templates/>
+      </xsl:when>
+      <xsl:when test="self::del">
+        <xsl:variable name="content"><xsl:apply-templates/></xsl:variable>
+        <xsl:sequence select="concat('{del=', $content, '-', @rend, '}')"/>
+      </xsl:when>
+      <xsl:when test="self::add">
+        <xsl:variable name="content"><xsl:apply-templates/></xsl:variable>
+        <xsl:sequence select="concat('{add=', $content, '-', @place, '}')"/>
+      </xsl:when>
+      <xsl:when test="self::unclear">
+        <xsl:text>{unclear–</xsl:text>
+        <xsl:apply-templates/>
+        <xsl:text>}</xsl:text>
+      </xsl:when>
+    </xsl:choose>
+    <xsl:if test="not($inside-word) and $next/self::text()">
+      <xsl:text> </xsl:text>
+    </xsl:if>
+  </xsl:template>
+
   <xsl:template match="subst">
     <xsl:text>&lt;</xsl:text>
     <xsl:apply-templates select="del"/>
     <xsl:apply-templates select="add"/>
     <xsl:text>&gt;</xsl:text>
-  </xsl:template>
-
-
-  <xsl:template match="del">
-    <xsl:if test="preceding-sibling::node()[1][self::text() or self::hi or self::lb]">
-      <xsl:text> </xsl:text>
-    </xsl:if>
-    <xsl:variable name="content">
-      <xsl:apply-templates/>
-    </xsl:variable>
-    <xsl:sequence select="concat('{del=', $content, '-', @rend, '}')"/>
-    <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
-      <xsl:text> </xsl:text>
-    </xsl:if>
-  </xsl:template>
-
-
-  <xsl:template match="add">
-    <xsl:if test="preceding-sibling::node()[1][self::text() or self::hi or self::lb]">
-      <xsl:text> </xsl:text>
-    </xsl:if>
-    <xsl:variable name="content">
-      <xsl:apply-templates/>
-    </xsl:variable>
-    <xsl:sequence select="concat('{add=', $content, '-', @rend, '}')"/>
-    <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
-      <xsl:text> </xsl:text>
-    </xsl:if>
   </xsl:template>
 
   <xsl:template match="gap">
