@@ -49,26 +49,29 @@
   <xsl:template match="unclear">{unclear–<xsl:apply-templates/>}</xsl:template>
 
   <xsl:template match="hi">
-    <xsl:if test="@rend='initial'">
-    <xsl:text>{initial=</xsl:text>
-      <xsl:apply-templates/>
-      <xsl:text>}</xsl:text>
-    </xsl:if>
-    <xsl:if test="@rend='ekthesis'">
-      <xsl:text>{ekthesis=</xsl:text>
-      <xsl:apply-templates/>
-      <xsl:text>}</xsl:text>
-    </xsl:if>
-    <xsl:if test="@rend='overline'">
-      <xsl:text>{overline=</xsl:text>
-      <xsl:apply-templates/>
-      <xsl:text>}</xsl:text>
-    </xsl:if>
-    <xsl:if test="@rend='rubricated'">
-      <xsl:apply-templates/>
-    </xsl:if>
+    <xsl:choose>
+      <xsl:when test="@rend='underline'">
+        <xsl:text>{underline=</xsl:text>
+        <xsl:apply-templates/>
+        <xsl:text>}</xsl:text>
+        <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
+          <xsl:text> </xsl:text>
+        </xsl:if>
+      </xsl:when>
+      <xsl:when test="@rend='rubricated'">
+        <xsl:if test="preceding-sibling::node()[1][self::text() or self::hi or self::lb]">
+          <xsl:text> </xsl:text>
+        </xsl:if>
+        <xsl:apply-templates/>
+        <xsl:if test="following-sibling::node()[1][self::text() or self::hi or self::lb]">
+          <xsl:text> </xsl:text>
+        </xsl:if>
+      </xsl:when>
+      <xsl:otherwise>
+        <xsl:apply-templates/>
+      </xsl:otherwise>
+    </xsl:choose>
   </xsl:template>
-
 
   <xsl:template match="pb">
     <xsl:choose>
