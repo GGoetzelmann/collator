@@ -127,3 +127,4 @@ if submitted:
     # Clean up temp files
     for path in temp_file_paths:
         os.remove(path)
+    os.remove(temp_norm_file.name)
